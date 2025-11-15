@@ -1,0 +1,485 @@
+---
+title: "Analysis_Google_Final_Project_ACD"
+author: "Andrea Cendón"
+date: "2025-11-10"
+output: html_document
+---
+
+# Analysis RMarkdown  
+
+## Step 1. Install packages and libraries. 
+
+* rmarkdown -> Creates dynamic analysis documents that can have code, outputs and text.   
+* skimr -> It is used for data summarization. It is necessary to upload its library.    
+* tidyverse ->  Collection of packages that do data import, cleaning, transformation, visualization and a consistent and efficient analysis. It is necessary to upload its library.   
+  + Libraries of tydiverse:  
+    + dplyr -> It is used for data manipulation.  
+    + tidyr -> Is used to clean and organize data by reshaping it into a structured format where the columns are variables and each the rows are observations.  
+    + lubridate -> Allows RStudio to understand date-times and modify them.
+
+Other libraries upload: 
+ * readr ->  Allow us to import and read rectangular data (CSV) in data frames.  
+ * ggplot2 ->  It is used for data visualization.
+ * ggrepel ->
+ * RColorBrewer ->
+
+```{r setup, message=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(readr)
+library(lubridate)
+library(skimr)
+library(tidyverse)
+library(ggplot2)
+library(ggrepel)
+library(RColorBrewer)
+```
+
+##STEP 2. Import de data set   
+
+File clean and filter, ready for analysis.    
+
+```{r}
+#STEP 2. Import de data set 
+# File clean and filter, ready for analysis
+Daily_Activity_df <- read.csv("C:/Proyecto Google/Prepare/Analysis/Daily_Activity_ready_for_analysis.csv")
+
+```
+
+# Analysis 1: Number of registers per ID  
+
+I made another data frame for the number of records per user.  
+
+```{r}
+records_count_ID <- Daily_Activity_df %>%
+  group_by(Id) %>%    #group every value ID.
+  summarise(Num_Entradas = n())  # Count how many time the Id shows up
+print(records_count_ID, n=33)    # Shows the number of registers of each Id.
+```
+
+Obtain the statistic values for the count of registers per ID.   
+
+```{r}
+summary(records_count_ID$Num_Entradas)
+```
+
+The values show us that 5 is the minimum value of records and 28 is the maximum value, but the most common count of registers is 11. The 50% of the users have between 8 and 11 records.
+
+The following bar chart shows user records to check their consistency.  
+
+Graph  
+```{r}
+ggplot(records_count_ID, aes(x = reorder(Id, Num_Entradas), y = Num_Entradas, fill = Num_Entradas)) +
+  geom_col() +
+  scale_fill_gradient(low = "#A6CEE3", high = "#1F78B4", name = "Recorded days") +
+  labs(
+    title = "Number of days register per ID",
+    x = "ID of the user",
+    y = " Count of active days"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/Register_days_per_ID.png",
+       width = 8, height = 5, dpi = 300)
+```
+ 
+reorde() -> arrange by bar height  
+theme(axis.text.x = element_text(angle = 90)) rotate the labels so they don't pile up  
+ 
+# Analysis 2: Records per day of week and type of day (Weekday or Weekend).  
+
+Fix the format of ActivityDate from chr to date. Obtain each day of week in a new variable named DayOfWeek and in other variable (WeekType) put if it is Weekend or Weekday.  
+
+```{r}
+Daily_Activity_df <- Daily_Activity_df %>%
+  mutate(ActivityDate = ymd(ActivityDate),
+         DayOfWeek = wday(ActivityDate, label = TRUE, abbr = FALSE, locale = "en_US"),
+         WeekType = ifelse(DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
+```
+
+Count the records per week type (Weekday vs Weekend).   
+
+```{r}
+week_summary <- Daily_Activity_df %>%
+  group_by(WeekType) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+print(week_summary)
+```
+
+
+It can be seen that the number of records on weekdays (223) is almost double that on weekends (121). Therefore, it is used more during the week. However, it is important to consider that there are more weekdays than weekends. So we must look at its frequency per day.  
+
+Get the number of records per day of the week.
+
+```{r}
+weekday_summary <- Daily_Activity_df %>%
+  group_by(DayOfWeek) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+print(weekday_summary)
+```
+
+Sunday is the day with the most records and therefore the most activity, while Thursday has the least activity. Saturday and Sunday seem to be the days with the most activity compared to the others, suggesting greater interest in monitoring activity during free time.    
+
+The average activity was calculated for weekends and workdays.    
+
+```{r}
+promedio_weekend = week_summary$count[week_summary$WeekType=="Weekend"] / 2
+promedio_weekday = week_summary$count[week_summary$WeekType=="Weekday"] / 5
+
+promedio_weekend # 60.5 de biggest mean is in the weekend.
+promedio_weekday # 44.6
+```
+Although users recorded more days of activity during the week, this is because there are more working days than weekend days. Further analysis shows that, per day, users tend to use the device more on weekends.  
+
+Bar graph
+
+```{r}
+ggplot(weekday_summary, aes(x = reorder(DayOfWeek, count), y = count, fill = count)) +
+  geom_col() +
+  scale_fill_gradient(low = "#ffeda0", high = "#f03b20") +
+  labs(title = "Records per Day of the Week", x = "Day", y = "Number of Records") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/registro_dias_semana.png",
+       width = 7, height = 5, dpi = 300, bg = "transparent")
+```
+
+# Analysis 3: Adherence analysis by minute
+
+Import the data with out the last filter. 
+
+```{r}
+Daily_Activity_df_adherence <- read.csv("C:/Proyecto Google/Prepare/Analysis/Daily_Activity_without_filter_of_minutes.csv")
+
+head (Daily_Activity_df_adherence)
+str(Daily_Activity_df_adherence) #366 obs
+print(length(unique(Daily_Activity_df_adherence$Id))) #34
+```
+
+Classify usage of the device by category using the minutes.  
+
+```{r}
+Daily_Activity_df_adherence <- Daily_Activity_df_adherence %>%
+  mutate(Total_Minutes = VeryActiveMinutes + FairlyActiveMinutes + LightlyActiveMinutes + SedentaryMinutes,
+         Use_category = case_when(
+           Total_Minutes < 300 ~ "Low use",
+           Total_Minutes >= 300 & Total_Minutes < 720 ~ "Moderate use",
+           Total_Minutes >= 720 & Total_Minutes < 1080 ~ "High",
+           Total_Minutes >= 1080 ~ "Very High"
+         ))
+
+head(Daily_Activity_df_adherence) # It work
+str(Daily_Activity_df_adherence)
+```
+
+We generate a new variable that contains the categories of low use, Moderate use, High and Very High according to thresholds in minutes.     
+
+Low use is 300 minutes, equivalent to 5 hours; having this or fewer than these hours recorded indicates low adherence to the device. It represents occasional use, in which the user only uses it from time to time (Troiano et al., 2007; Migueles et al., 2017).   
+
+Moderate use is based on device use between 300 (5 hours) and 720 minutes (12 hours); it was chosen because scientific studies of wearables show that ≥ 8–10 hours per day are necessary to obtain valid data. For this category, 5-12 hours was chosen as the limit to capture the lowest threshold and the recommended range (Troiano et al., 2007; Migueles et al., 2017).    
+
+High use is between 720 minutes (12 hours) and 1080 minutes (18 hours), which is scientifically considered to be adequate adherence for users who spend this amount of time with the wearable, as they are using it most of the day (Migueles et al., 2017; Evenson et al., 2015).    
+
+Very high use is greater than 1080 minutes (18 hours), which represents users who are highly adherent to the device, as they use it all day or almost continuously (Lyden et al., 2021).    
+
+Summary of usage categories :
+
+```{r}
+usage_summary <- Daily_Activity_df_adherence %>%
+  group_by(Use_category) %>%
+  summarise(Days = n(),
+            Percentage = (n()/nrow(Daily_Activity_df_adherence))*100) %>%
+  mutate(Label = paste0(Use_category, " (", round(Percentage, 1), "%)"))
+
+print(usage_summary)
+```
+
+The biggest percentage obtained is from the category "Very High," which is 56.8% (208 days). In second place is the category "High" with a value of 35.8% (131 days). In third place is "Moderate use" with a value of 4.6% (17 days). And in fourth place is the category "Low use," which represents a value of 2.7% (10 days). It seems that most of the days the users performed a "very high" use of the device.   
+
+Adherence pie chart 
+
+```{r}
+ggplot(usage_summary, aes(x = "", y = Days, fill = Label)) +
+  geom_col(width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  theme_void() + #makes the background transparent
+  labs(fill = "Usage Category") + #legend
+  ggtitle("Daily Activity Usage") +  # Title
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"), # Centered and larger title
+    legend.title = element_text(size = 14, face = "bold"),  # Title of the legend 
+    legend.text = element_text(size = 12) # Text of the legend
+  ) +
+  scale_fill_brewer(palette = "Set2") 
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/Distribution_usage_categories.png",
+       width = 7, height = 5, dpi = 300, bg = "transparent")
+
+```
+
+# Analysis 4. Compare adherence vs. number of records  
+
+Obtain adherence per user (percentage of active days)  
+
+```{r}
+adherencia_df <- Daily_Activity_df_adherence %>%
+  group_by(Id) %>%
+  summarise(Adherencia = n()/nrow(Daily_Activity_df_adherence)*100)
+print(adherencia_df) # Gives the percentage of adherence per ID 
+
+```
+
+Join the number of registers with the percentage of adherence from each ID in the same data frame.  
+
+```{r}
+comparison_df <- records_count_ID %>%
+  left_join(adherencia_df, by = "Id")
+print (comparison_df) 
+```
+
+records_count_ID has 33 IDs because it came from the dataset that also filters the atypical values of calories.  
+
+adherencia_df has 34 IDs because it came from the unfiltered dataset.    
+
+The function left_join in R takes as a base the users from the first dataset (records_count_ID). Because of that, the result shows only 33 IDs. This is correct because we are increasing the quality of the data.    
+
+Scatter plot  
+
+```{r}
+ggplot(comparison_df, aes(x = Num_Entradas, y = Adherencia)) +
+  geom_jitter(width = 0.2, height = 0.2, color = "steelblue", size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  labs(title = "Adherence vs Number of Entries per User",
+       x = "Number of Entries",
+       y = "Adherence (%)") +
+  theme_minimal(base_size = 14)
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/Adherence_vs_Entries.png",
+       width = 7, height = 5, dpi = 300, bg = "transparent")
+```
+
+comparison_df has a row per Id.  
+x = Num_Entradas → number of registers per user.  
+y = Adherence (%) → percentage of the active days per ID.  
+geom_point(color = "steelblue", alpha = 0.7) → All the points in this color “steelblue”.  
+Each point represents a user.  
+Some points appear darker than others because there are overlapping points at those values of (Num_Entries, Adherence).   
+Red line: general trend. If it rises from left to right, it means that more records are associated with greater adherence.  
+
+The graph shows that almost all the users have between 5 and 16 registers and an adherence level between 0% and 5%. One of the users has 28 records and almost 8% adherence. Also, the points are near to the increasing trend line, which means that the higher the number of registers, the higher the percentage of adherence of the users to the device.  
+
+
+Correlation analysis (Pearson's correlation coefficient)
+
+```{r}
+cor(comparison_df$Num_Entradas, comparison_df$Adherencia, use = "complete.obs") # 0.9942141
+```
+
+The value obtained from the correlation is 0.994, which means that the variables have a nearly perfect relationship.  
+# Analysis 5. Mobility profile of the users.    
+
+For each user, the mobility profile is calculated based on the value of the total distance for each day. The profiles are as follows: sedentary (less than 0.9 miles), light (0.9 to less than 3 miles), moderate (3 to less than 4.7 miles), and high (more than 4.7 miles).  
+
+The distance ranges were obtained from the literature (Tudor-Locke et al., 2011; Oja et al., 2018) and were converted from kilometers to miles, as our distances are in miles.  
+
+```{r}
+daily_profile <- Daily_Activity_df %>% 
+  mutate( # distance in miles
+    DistanceCategory = case_when(
+      TotalDistance < 0.9 ~ "Sedentary",
+      TotalDistance >= 0.9 & TotalDistance < 3.0 ~ "Light",
+      TotalDistance >= 3.0 & TotalDistance < 4.7 ~ "Moderate",
+      TotalDistance >= 4.7 ~ "High",
+      TRUE ~ "Unknown"
+    )
+  )
+```
+
+This generates a new df with a new column, in which all the registers are classified as the mobility profiles.   
+
+```{r}
+user_profile <- daily_profile %>%
+  group_by(Id, DistanceCategory) %>% 
+  summarise(days = n(), .groups = "drop") %>%
+  group_by(Id) %>%
+  slice_max(days, n = 1, with_ties = FALSE) %>%
+  ungroup() 
+
+print(user_profile, n= 33)
+```
+
+Generates a data frame that contains each user's profile by summarizing its registered profiles and the number of days.
+
+```{r}
+profile_counts <- user_profile %>%
+  count(DistanceCategory) %>%
+  mutate(percentage = round(n / sum(n) * 100, 2))
+
+print(profile_counts)
+```
+
+The step consists of obtaining how many IDs are in each profile and their percentages. The results show that 15 IDs have a high activity distance profile, and they represent 45.4% of the users. Seven IDs were classified as having a light activity distance profile (21.2%), five IDs have a moderate profile (15.2%), and six IDs have a sedentary profile (18.2%).    
+
+Pie chart   
+
+```{r}
+ggplot(profile_counts, aes(x = "", y = percentage, fill = DistanceCategory)) +
+  geom_col(width = 1) +
+  coord_polar("y") +
+  geom_text(aes(label = paste0(percentage, "%")), 
+            position = position_stack(vjust = 0.5), size = 5) +
+  labs(title = "User Activity Profiles Based on Daily Distance") +
+  theme_void() +
+  theme(legend.title = element_blank())
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/User_Activity_Profiles_PieChart.png",
+       width = 7, height = 6, dpi = 300, bg = "transparent")
+
+```
+
+# Analysis 6. Steps vs Calories
+
+Check that the variables does not have NA.  
+
+```{r}
+skim(Daily_Activity_df$Calories) # No NA
+skim(Daily_Activity_df$TotalSteps) # No NA
+```
+
+Neither of the variables have missing values, so we can continue with the analysis.     
+
+Make a scatter plot to visualize the relationship between steps and calories. It is expected a positive correlation.  
+
+```{r}
+ggplot(Daily_Activity_df, aes(x = TotalSteps, y = Calories)) +
+  geom_point(color = "#1f77b4", alpha = 0.6, size = 3) +
+  geom_smooth(method = "lm", color = "#d62728", se = TRUE) +
+  labs(
+    title = " Relationship between daily steps and burned calories",
+    x = "Daily Total steps",
+    y = "Burned calories"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/Relationship_dailysteps_vs_burnedcalories.png",
+       width = 7, height = 5, dpi = 300, bg = "transparent")
+```
+
+
+Blue points represent the registers for each user. The red line is the linear trend line (linear model). It summarizes the average relationship between steps and calories. The gray shadow around the red line, known as the "confidence interval," represents the 95% confidence level of the linear model.  
+
+Analyzing the scatter plot, it was observed that most of the registers have around 10700 steps per day, and the user burns between 1000 kcal and 4000 kcal per day. The linear trend line increases to the right part of the scatter plot, indicating that there is a positive relationship between the variables (more steps, more burned calories). Between 0 and 10000 steps, the confidence interval shows that the data is less variable than between 10000 steps and 20600 steps.  
+
+
+To confirm the results, a Pearson correlation analysis was performed.  
+
+```{r}
+cor(Daily_Activity_df$TotalSteps, Daily_Activity_df$Calories, use = "complete.obs") #0.5396948
+```
+
+The value obtained is 0.53969448, which means that the variables have a moderate relationship, not a strong one. This can be biased based on individual variability in device usage and the differences between the metabolisms of the users. However, the relationship is not perfectly linear; we can say that if the user walks more steps, they tend to burn more calories.  
+
+# Analysis 7. Comparison between average steps on weekends vs. weekdays  
+
+Obtain the mean of total steps by user and type of week (weekend or weekday).     
+
+```{r}
+avg_steps_user <- Daily_Activity_df %>%
+  group_by(Id, WeekType) %>%
+  summarise(avg_steps = mean(TotalSteps, na.rm = TRUE)) %>%
+  ungroup()
+
+print(avg_steps_user, n=100)
+```
+
+By averaging the number of steps per user, each person has the same weight in the final result, avoiding bias due to the number of records. The result shows 66 rows because for each ID that we have, we obtain the average of total steps by type of week (weekend or weekday).  
+
+Obtain the overall average by type of week (average of averages).  
+
+```{r}
+avg_steps_summary <- avg_steps_user %>%
+  group_by(WeekType) %>%
+  summarise(
+    mean_steps = mean(avg_steps, na.rm = TRUE),
+    sd_steps = sd(avg_steps, na.rm = TRUE),
+    n = n(),
+    se_steps = sd_steps / sqrt(n)  # standard error
+  )
+
+print(avg_steps_summary)
+```
+
+Here we obtain the average number of steps per weekday and weekend, SD, number of users 33, and their standard errors.  
+
+Graph comparison: Weekday vs. Weekend  
+
+```{r}
+ggplot(avg_steps_summary, aes(x = WeekType, y = mean_steps, fill = WeekType)) +
+  geom_col(width = 0.6, color = "black", alpha = 0.8) +
+  geom_errorbar(aes(ymin = mean_steps - se_steps, ymax = mean_steps + se_steps),
+                width = 0.2, color = "gray20", linewidth = 0.8) +
+  geom_text(aes(label = round(mean_steps, 0)), vjust = -0.5, size = 4.2) +
+  labs(
+    title = "Average Steps per User on Weekdays vs. Weekends",
+    x = "",
+    y = "Average Steps per User"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/Average_Steps_per_User_Weekdays_vs_Weekends.png",
+       width = 7, height = 5, dpi = 300, bg = "transparent")
+```
+
+The results show that the average number of steps per day is higher on weekdays (6910 steps) than on weekends (6536). The difference between the two averages is not very large (around 374), and the overlap of their standard error bars indicates that the difference is not statistically significant; however, it tends to be slightly higher on weekdays. The difference between the averages is because the data has a high dispersion attributed to the fact that some users tend to take fewer steps than others.   
+
+# Analysis 8. Classification by type of day and activity profile    
+
+Count number of records in each distance category per type of day.  
+
+```{r}
+activity_by_daytype <- daily_profile %>%
+  group_by(WeekType, DistanceCategory) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(WeekType) %>%
+  mutate(percentage = round(count / sum(count) * 100, 1))
+
+print(activity_by_daytype)
+```
+
+The result is the number of registers in each type of week, categorized by the activity level in distance.    
+
+Stacked bar chart to visualize the proportion of each activity level per type of day.  
+
+```{r}
+ggplot(activity_by_daytype, aes(x = WeekType, y = percentage, fill = DistanceCategory)) +
+  geom_col(color = "black") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Activity Profiles by Type of Day",
+    x = "",
+    y = "Percentage of Records (%)",
+    fill = "Activity Profile"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+ggsave("C:/Proyecto Google/Prepare/Analysis/Plots/Activity_Profiles_by_Type_of_Day.png",
+       width = 7, height = 5, dpi = 300, bg = "transparent")
+```
+
+During the week, 48.4% have a high active profile, 17% are light active, 14% are moderate active, and 20.2% are sedentary active. In contrast, during the weekend, 40.5% have a high active profile, 24% are light active, 18.2% are moderate active, and 17.4% are sedentary active.  
+
+The type of day is compared, and it can be observed that the highest percentages in both cases are for high activity distance; however, on workdays, the records in this category increase by 7.9%. The light active profile increases by 7% from workdays to weekends. In the case of the moderately active profile, the percentage during weekends increases by 3.9% compared to workdays. The percentage of the sedentary active profile is 2.8% higher on workdays.  
+
+
+
+
+
+
+
