@@ -2,14 +2,14 @@
 My final project for the Google Data Analysis course is focused on the Bellabeat company case study, which is available in this repository. The objective is based on analyzing the company's data to identify trends in user behavior, so that more effective marketing strategies can be employed.
 
 ## Repository files: 
-1. : Code to prepare, process and clean de data
-2. : RMarkdown of the previous code
-3. : Clean CSV file with all filters
-4. : CSV file without the last filter
-5. : Code of the analysis and visualizations of the project
-6. : RMarkdown of the previous code
-7. : Final Report in PDF format
-8. : Presentation of the final report
+1. ´Case_Study_Prepare_Process_code_ACD.R´: Code to prepare, process and clean de data
+2. ´Case_Study_Bellabeat_Prepare_Process_ACD.Rmd´: RMarkdown of the previous code
+3. ´Daily_Activity_ready_for_analysis.csv´: Clean CSV file with all filters
+4. ´Daily_Activity_without_filter_of_minutes.csv´: CSV file without the last filter
+5. ´Analysis file.R´: Code of the analysis and visualizations of the project
+6. ´Analysis_Google_Final_Project_ACD.Rmd´: RMarkdown of the previous code
+7. ´Case_2_Bellabeat_Google_Project_ACD.pdf´: Final Report in PDF format
+8. ´Bellabeat_Google_Project_ACD.pptx´: Presentation of the final report
 
 ## Link to download the originals datasets:
 
